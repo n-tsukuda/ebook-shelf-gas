@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>電子ブック本棚 デモ</title><script>window.__DEMO_BOOKS__ = [{"id": "company-profile", "title": "会社案内 2026", "file": "samples/01_company-profile.pdf", "fileName": "01_company-profile.pdf", "pageCount": 8, "direction": "ltr", "allowDownload": true, "cover": "covers/company-profile.jpg", "createdAt": "2026-10-07T00:00:00Z"}, {"id": "cafe-menu", "title": "喫茶ことり メニュー", "file": "samples/02_cafe-menu.pdf", "fileName": "02_cafe-menu.pdf", "pageCount": 8, "direction": "ltr", "allowDownload": true, "cover": "covers/cafe-menu.jpg", "createdAt": "2026-10-07T00:00:00Z"}, {"id": "vertical-rtl", "title": "季節のことば", "file": "samples/03_vertical-rtl.pdf", "fileName": "03_vertical-rtl.pdf", "pageCount": 8, "direction": "rtl", "allowDownload": true, "cover": "covers/vertical-rtl.jpg", "createdAt": "2026-10-07T00:00:00Z"}, {"id": "town-guide", "title": "港町・汐見を歩く", "file": "samples/04_town-guide.pdf", "fileName": "04_town-guide.pdf", "pageCount": 8, "direction": "ltr", "allowDownload": true, "cover": "covers/town-guide.jpg", "createdAt": "2026-10-07T00:00:00Z"}];</script><script>// GitHub Pages のデモ用：GAS の google.script.run / history を、静的ファイルで置き換える。
+// demo/build.py がビルド時に BOOKS を埋め込み、各ページの <head> 先頭に差し込む。
+(function () {
+  const BOOKS = window.__DEMO_BOOKS__;
+  const find = id => BOOKS.find(b => b.id === id);
+
+  const api = {
+    getShelf() {
+      return BOOKS.map(b => ({ id: b.id, title: b.title, pageCount: b.pageCount, cover: b.cover, createdAt: b.createdAt }));
+    },
+    // GAS 版は4MBずつ返すが、デモは chunkCount=1 にしてファイル全体を一度に返す
+    async getPdfChunk(id) {
+      const b = find(id);
+      if (!b) throw new Error('ブックが見つかりません');
+      const blob = await fetch(b.file).then(r => {
+        if (!r.ok) throw new Error('PDFを取得できませんでした（' + r.status + '）');
+        return r.blob();
+      });
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result).split(',')[1]);
+        fr.onerror = () => reject(fr.error);
+        fr.readAsDataURL(blob);
+      });
+    },
+  };
+
+  function makeRunner(ok, ng) {
+    return new Proxy({}, {
+      get(_, fn) {
+        if (fn === 'withSuccessHandler') return h => makeRunner(h, ng);
+        if (fn === 'withFailureHandler') return h => makeRunner(ok, h);
+        return (...args) => {
+          if (!api[fn]) { if (ng) ng(new Error('デモ版では使えない機能です')); return; }
+          Promise.resolve().then(() => api[fn](...args)).then(r => ok && ok(r), e => ng && ng(e));
+        };
+      },
+    });
+  }
+
+  window.google = {
+    script: {
+      run: makeRunner(null, null),
+      history: {
+        replace(_, params) {
+          try { history.replaceState(null, '', '?' + new URLSearchParams(params)); } catch (e) { /* 失敗しても閲覧には影響しない */ }
+        },
+      },
+    },
+  };
+
+  /** viewer.html の BOOT を URL から組み立てる（GAS 版では doGet が行う処理） */
+  window.__demoViewerBoot = function () {
+    const q = new URLSearchParams(location.search);
+    const b = find(q.get('book'));
+    if (!b) {
+      location.replace('./');
+      throw new Error('book not found');
+    }
+    return {
+      execUrl: location.origin + location.pathname,   // 共有用URL（viewer.html?book=…）
+      homeUrl: './',
+      startPage: Number(q.get('p')) || 1,
+      fromShelf: q.get('open') === '1',
+      book: {
+        id: b.id, title: b.title, fileName: b.fileName, size: 0, pageCount: b.pageCount,
+        direction: b.direction, allowDownload: b.allowDownload, cover: b.cover,
+        chunkSize: 0, chunkCount: 1,
+      },
+    };
+  };
+
+  // 本棚の下に「デモ版」の注記を出す
+  window.addEventListener('DOMContentLoaded', () => {
+    const footer = document.querySelector('body.paper footer');
+    if (!footer) return;
+    const note = document.createElement('p');
+    note.style.cssText = 'margin:14px 0 0;font-size:13px;color:var(--ink-2);line-height:1.8';
+    note.innerHTML = 'これはデモ版です。PDFの登録は、Google Apps Script に設置すると使えます。<br><a href="https://github.com/n-tsukuda/ebook-shelf-gas">GitHub でコードを見る</a>';
+    footer.appendChild(note);
+  });
+})();
+</script>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+  :root {
+    /* 紙と墨と真鍮 */
+    --paper: #f4efe6;
+    --bg: var(--paper);
+    --surface: #fbf8f2;
+    --ink: #2a2521;
+    --ink-2: #5c5348;       /* 紙の上で 6.6:1 */
+    --ink-3: #6f6558;       /* 紙の上で 5.0:1（これより薄い色を文字に使わない） */
+    --line: #ddd4c4;
+    --brass: #a8854a;       /* 線・帯などの飾り用。文字には --brass-text */
+    --brass-text: #84652f;  /* 紙の上で 4.7:1 */
+    --brass-2: #c9a96a;
+    --accent: #2a2521;
+    --accent-ink: #f7f2e8;
+    --danger: #a3392e;
+    /* 閲覧室 */
+    --night: #181512;
+    --night-2: #2c2620;
+    --night-ink: #ece4d6;
+    --night-ink-2: #c4b9a6; /* 閲覧室の背景の上で 7.7:1 */
+    --radius: 6px;
+    --shadow: 0 1px 2px rgba(42,37,33,.06), 0 8px 24px rgba(42,37,33,.07);
+    --mincho: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --gothic: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+    --latin: "Cormorant Garamond", "Times New Roman", serif;
+    --ease: cubic-bezier(.2, .7, .2, 1);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--gothic);
+    font-size: 15px;
+    line-height: 1.7;
+    letter-spacing: .02em;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* うっすら紙の質感 */
+  body.paper {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .25 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  a { color: var(--brass-text); }
+  button, input, select { font: inherit; color: inherit; letter-spacing: inherit; }
+  .eyebrow {
+    font-family: var(--latin); font-weight: 600; font-size: 15px;
+    letter-spacing: .26em; text-transform: uppercase; color: var(--brass-text);
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 40px; padding: 0 18px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: transparent; cursor: pointer; text-decoration: none; color: var(--ink);
+    white-space: nowrap; font-size: 14px; transition: background .2s, border-color .2s, color .2s;
+  }
+  .btn:hover { border-color: var(--ink); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { background: #000; }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover { border-color: var(--danger); }
+  .btn.small { min-height: 34px; padding: 0 14px; font-size: 14px; }
+  .icon-btn {
+    width: 40px; height: 40px; padding: 0; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    background: transparent; border: 1px solid transparent; cursor: pointer; color: inherit;
+    transition: background .2s, border-color .2s, opacity .2s;
+  }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .icon-btn:disabled { opacity: .3; cursor: default; }
+  svg.i { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .muted { color: var(--ink-2); }
+  :focus-visible { outline: 2px solid var(--brass-2); outline-offset: 2px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(16px);
+    background: rgba(28,24,21,.92); color: #f4ede1; padding: 10px 22px; border-radius: 999px;
+    font-size: 14px; opacity: 0; pointer-events: none; transition: .3s var(--ease); z-index: 1000;
+    width: max-content; max-width: calc(100% - 32px); text-align: center;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--danger); }
+  .spinner {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid rgba(127,127,127,.2); border-top-color: currentColor;
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+  }
+</style>
+
+  <style>
+    .masthead { text-align: center; padding: 64px 16px 8px; }
+    .masthead h1 {
+      font-family: var(--mincho); font-weight: 600; font-size: clamp(26px, 4.4vw, 40px);
+      letter-spacing: .14em; margin: 10px 0 0; line-height: 1.4;
+    }
+    .ornament { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 20px auto 0; color: var(--brass); }
+    .ornament::before, .ornament::after { content: ""; width: 56px; height: 1px; background: currentColor; opacity: .5; }
+    .ornament span { width: 6px; height: 6px; transform: rotate(45deg); border: 1px solid currentColor; }
+    .count { font-size: 14px; letter-spacing: .12em; color: var(--ink-2); margin: 14px 0 0; }
+
+    .toolbar {
+      max-width: 1120px; margin: 28px auto 0; padding: 0 16px;
+      display: flex; justify-content: center; align-items: center; gap: 16px; position: relative;
+    }
+    .search { position: relative; width: min(340px, 100%); }
+    .search svg { position: absolute; left: 2px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--ink-3); }
+    .search input {
+      width: 100%; height: 42px; padding: 0 4px 0 30px; border: 0; border-bottom: 1px solid var(--line);
+      background: transparent; font-size: 15px; outline: none; transition: border-color .2s; border-radius: 0;
+    }
+    .search input:focus { border-color: var(--ink); }
+    .search input::placeholder { color: var(--ink-3); }
+    .admin-link {
+      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+      font-size: 14px; color: var(--ink-2); text-decoration: none; letter-spacing: .06em;
+    }
+    .admin-link:hover { color: var(--ink); }
+
+    main { max-width: 1120px; margin: 0 auto; padding: 56px 16px 40px; }
+    .shelf {
+      display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+      grid-template-rows: auto auto auto; margin-bottom: 64px;
+    }
+    .slot { grid-row: 1; display: flex; align-items: flex-end; justify-content: center; padding: 0 13%; }
+    .plank {
+      grid-row: 2; grid-column: 1 / -1; height: 16px; margin: 0 -10px; position: relative; z-index: 0;
+      border-radius: 2px;
+      background:
+        repeating-linear-gradient(90deg, rgba(255,255,255,0) 0 37px, rgba(255,255,255,.05) 37px 39px, rgba(0,0,0,.04) 39px 63px),
+        linear-gradient(#b8936a, #9a7650 35%, #7a5b3d);
+      box-shadow: inset 0 1px 0 rgba(255,240,215,.45), 0 12px 18px -8px rgba(70,42,15,.5), 0 2px 0 #5e4430;
+    }
+    .label { grid-row: 3; padding: 18px 10% 0; text-align: center; min-width: 0; }
+    .label a { color: inherit; text-decoration: none; }
+    .label .t {
+      font-family: var(--mincho); font-weight: 700; font-size: 16px; line-height: 1.55; letter-spacing: .04em; color: var(--ink);
+      word-break: auto-phrase; /* 「メニュ／ー」のような途中の改行を避ける（対応ブラウザのみ） */
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .label a:hover .t { color: var(--brass-text); }
+    .label .m { font-size: 13px; letter-spacing: .04em; color: var(--ink-3); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+    .book {
+      position: relative; display: block; width: 100%; z-index: 1;
+      transform-origin: 50% 100%; transition: transform .45s var(--ease), filter .45s var(--ease);
+      filter: drop-shadow(0 1px 1px rgba(40,25,10,.25)) drop-shadow(8px 10px 12px rgba(40,25,10,.18));
+      margin-bottom: -1px;
+    }
+    .book:hover, .book:focus-visible { transform: translateY(-10px); filter: drop-shadow(0 2px 2px rgba(40,25,10,.2)) drop-shadow(10px 22px 22px rgba(40,25,10,.22)); }
+    .book img, .book .blank { display: block; width: 100%; height: auto; border-radius: 1px 3px 3px 1px; background: #fff; }
+    /* 背の陰影 */
+    .book::before {
+      content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
+      background: linear-gradient(90deg, rgba(0,0,0,.22) 0, rgba(255,255,255,.22) 2%, rgba(0,0,0,.1) 3.5%, rgba(0,0,0,0) 8%, rgba(255,255,255,0) 92%, rgba(255,255,255,.12) 100%);
+    }
+    /* 小口（紙の厚み） */
+    .book::after {
+      content: ""; position: absolute; top: 3px; bottom: 2px; right: -5px; width: 5px; border-radius: 0 2px 2px 0;
+      background: repeating-linear-gradient(90deg, #f7f2e8 0 1px, #ddd2bf 1px 2px);
+    }
+    .book .blank {
+      aspect-ratio: 1 / 1.414; background: linear-gradient(135deg, #34493f, #24342d);
+      color: var(--brass-2); font-family: var(--mincho); font-weight: 600; font-size: 14px;
+      display: flex; align-items: center; justify-content: center; padding: 16%; text-align: center; line-height: 1.6;
+      border: 1px solid rgba(201,169,106,.35); outline: 1px solid rgba(201,169,106,.35); outline-offset: -8px;
+    }
+    .new {
+      position: absolute; top: 10px; right: -8px; z-index: 3;
+      font-family: var(--latin); font-weight: 600; font-size: 12px; letter-spacing: .16em;
+      background: var(--brass); color: #fff; padding: 2px 8px 2px 10px; box-shadow: 0 2px 4px rgba(0,0,0,.2);
+    }
+    .empty, .loading { text-align: center; color: var(--ink-2); padding: 72px 0; font-family: var(--mincho); letter-spacing: .1em; }
+    .loading .spinner { margin: 0 auto 16px; color: var(--brass); }
+    footer { text-align: center; padding: 8px 16px 48px; }
+    footer .eyebrow { color: var(--ink-3); font-size: 13px; }
+
+    /* 本を開く演出：表紙が棚から浮き上がって中央へ */
+    .opening { position: fixed; inset: 0; z-index: 100; perspective: 1800px; pointer-events: none; }
+    .opening .room {
+      position: absolute; inset: 0; opacity: 0; transition: opacity .7s var(--ease);
+      background: radial-gradient(ellipse 70% 60% at 50% 45%, var(--night-2), var(--night) 70%);
+    }
+    .opening.on .room { opacity: 1; }
+    .opening img {
+      position: fixed; transform-origin: 0 0; border-radius: 1px 3px 3px 1px;
+      box-shadow: 0 30px 60px rgba(0,0,0,.45);
+    }
+    @media (max-width: 560px) {
+      .masthead { padding-top: 44px; }
+      .admin-link { position: static; transform: none; }
+      .toolbar { flex-direction: column; gap: 10px; }
+      main { padding-top: 44px; }
+      .shelf { margin-bottom: 48px; }
+      .label { padding: 14px 6% 0; }
+      .label .t { font-size: 15px; }
+    }
+  </style>
+</head>
+<body class="paper">
+  <header class="masthead">
+    <div class="eyebrow">Library</div>
+    <h1 id="appTitle"></h1>
+    <div class="ornament"><span></span></div>
+    <p id="count" class="count">&nbsp;</p>
+  </header>
+  <div class="toolbar">
+    <label class="search">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+      <input id="q" type="search" placeholder="タイトルで探す" aria-label="タイトルで探す">
+    </label>
+    <a id="adminLink" class="admin-link" hidden>管理画面 →</a>
+  </div>
+  <main>
+    <div id="list" class="loading"><div class="spinner"></div>本棚を整えています</div>
+  </main>
+  <footer><div class="eyebrow">Digital Library</div></footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  // 日本語PDF（フォント非埋め込み）を正しく描くために CMap と標準フォントを読ませる
+  const PDF_OPTS = {
+    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+    cMapPacked: true,
+    standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/',
+  };
+
+  /** google.script.run を Promise で呼ぶ */
+  function run(fn, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(err => reject(err instanceof Error ? err : new Error(String(err && err.message || err))))[fn](...args);
+    });
+  }
+
+  /**
+   * GASの画面は別オリジンのiframeで動くため、CDNのワーカーを new Worker() で直接は起動できない。
+   * 中身を取ってきて Blob URL にして渡す。失敗しても pdf.js はメインスレッドで動く。
+   */
+  let pdfjsReady = null;
+  function loadPdfjs() {
+    if (!pdfjsReady) {
+      pdfjsReady = fetch(PDFJS_WORKER_URL)
+        .then(r => r.text())
+        .then(src => {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+        })
+        .catch(() => { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL; })
+        .then(() => pdfjsLib);
+    }
+    return pdfjsReady;
+  }
+
+  function toast(msg, isError) {
+    let el = document.getElementById('toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'toast';
+      el.className = 'toast';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.toggle('error', !!isError);
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), isError ? 5000 : 2200);
+  }
+
+  /** iframe内では navigator.clipboard が塞がれることがあるので execCommand に逃がす */
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+      ta.remove();
+      return ok;
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function formatSize(bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+  }
+</script>
+
+  <script>
+    const BOOT = {"execUrl": "viewer.html", "appTitle": "電子ブック本棚 デモ", "adminUrl": ""};
+    const NEW_DAYS = 14;
+    let books = [];
+
+    document.getElementById('appTitle').textContent = BOOT.appTitle;
+    if (BOOT.adminUrl) {
+      const a = document.getElementById('adminLink');
+      a.href = BOOT.adminUrl;
+      a.hidden = false;
+    }
+
+    function columns() {
+      const w = document.querySelector('main').clientWidth - 32;
+      if (w < 520) return 2;
+      return Math.max(3, Math.min(6, Math.floor(w / 180)));
+    }
+
+    function bookUrl(b) {
+      return BOOT.execUrl + '?book=' + encodeURIComponent(b.id) + '&open=1';
+    }
+
+    function isNew(b) {
+      const d = new Date(b.createdAt);
+      return !isNaN(d) && (Date.now() - d) / 86400000 < NEW_DAYS;
+    }
+
+    function shelfHtml(row, cols) {
+      const slots = row.map((b, i) => `
+        <div class="slot" style="grid-column:${i + 1}">
+          <a class="book" href="${bookUrl(b)}" tabindex="-1" aria-hidden="true">
+            ${b.cover ? `<img alt="" data-src="${escapeHtml(b.cover)}">` : `<div class="blank">${escapeHtml(b.title)}</div>`}
+            ${isNew(b) ? '<span class="new">NEW</span>' : ''}
+          </a>
+        </div>`).join('');
+      const labels = row.map((b, i) => `
+        <div class="label" style="grid-column:${i + 1}">
+          <a href="${bookUrl(b)}"><div class="t">${escapeHtml(b.title)}</div></a>
+          <div class="m">${b.pageCount}ページ　${formatDot(b.createdAt)}</div>
+        </div>`).join('');
+      return `<section class="shelf" style="--cols:${cols}">${slots}<div class="plank"></div>${labels}</section>`;
+    }
+
+    function formatDot(iso) {
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function draw() {
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const list = document.getElementById('list');
+      const shown = books.filter(b => !q || b.title.toLowerCase().includes(q));
+      document.getElementById('count').textContent = books.length ? '全 ' + books.length + ' 冊' : '';
+      if (!books.length) {
+        list.className = 'empty';
+        list.textContent = 'まだ本が並んでいません';
+        return;
+      }
+      if (!shown.length) {
+        list.className = 'empty';
+        list.textContent = '「' + q + '」に一致する本はありません';
+        return;
+      }
+      const cols = columns();
+      let html = '';
+      for (let i = 0; i < shown.length; i += cols) html += shelfHtml(shown.slice(i, i + cols), cols);
+      list.className = '';
+      list.innerHTML = html;
+      // dataURL は属性に直接書かず JS で入れる
+      list.querySelectorAll('img[data-src]').forEach(img => { img.src = img.dataset.src; });
+    }
+
+    document.getElementById('q').addEventListener('input', draw);
+    let lastCols = 0;
+    window.addEventListener('resize', () => {
+      const c = columns();
+      if (c !== lastCols && books.length) { lastCols = c; draw(); }
+    });
+
+    // ───────── 本を開く演出 ─────────
+    // リンク移動はそのまま進め、次の画面が届くまでの間に表紙を中央へ運ぶ。
+    // 閲覧画面の読み込み中の表紙と同じ位置・大きさに着地させてつなげる。
+    document.getElementById('list').addEventListener('click', e => {
+      const a = e.target.closest('a[href]');
+      if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const slot = a.closest('.slot') || document.querySelector(`.slot [href="${CSS.escape(a.getAttribute('href'))}"]`)?.closest('.slot');
+      const src = slot && slot.querySelector('img');
+      if (!src || !src.naturalWidth) return;
+      playOpening(src);
+    });
+
+    function playOpening(src) {
+      const r = src.getBoundingClientRect();
+      const aspect = src.naturalWidth / src.naturalHeight;
+      const h = Math.min(window.innerHeight * 0.62, 560, (window.innerWidth - 48) / aspect);
+      const w = h * aspect;
+      const left = (window.innerWidth - w) / 2;
+      const top = (window.innerHeight - h) / 2;
+
+      const ov = document.createElement('div');
+      ov.className = 'opening';
+      ov.innerHTML = '<div class="room"></div>';
+      const img = new Image();
+      img.src = src.src;
+      Object.assign(img.style, { left: left + 'px', top: top + 'px', width: w + 'px', height: h + 'px' });
+      ov.appendChild(img);
+      document.body.appendChild(ov);
+      src.closest('.book').style.visibility = 'hidden';
+
+      const s = r.width / w;
+      img.animate([
+        { transform: `translate(${r.left - left}px, ${r.top - top}px) scale(${s})`, boxShadow: '0 4px 10px rgba(0,0,0,.2)' },
+        { transform: `translate(${(r.left - left) * .35}px, ${(r.top - top) * .35 - 20}px) scale(${(s + 1) / 2}) rotateY(-10deg)`, offset: .55 },
+        { transform: 'none', boxShadow: '0 30px 60px rgba(0,0,0,.45)' },
+      ], { duration: 900, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+      requestAnimationFrame(() => ov.classList.add('on'));
+
+      // 戻るボタンで戻ってきたとき・移動できなかったときに元へ戻す
+      const restore = () => { ov.remove(); src.closest('.book').style.visibility = ''; };
+      setTimeout(restore, 15000);
+      window.addEventListener('pageshow', restore, { once: true });
+    }
+
+    run('getShelf')
+      .then(res => { books = res; lastCols = columns(); draw(); })
+      .catch(err => {
+        const list = document.getElementById('list');
+        list.className = 'empty';
+        list.textContent = '読み込めませんでした：' + err.message;
+      });
+  </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "company-profile",
+    "title": "会社案内 2026",
+    "file": "samples/01_company-profile.pdf",
+    "fileName": "01_company-profile.pdf",
+    "pageCount": 8,
+    "direction": "ltr",
+    "allowDownload": true,
+    "cover": "covers/company-profile.jpg",
+    "createdAt": "2026-10-07T00:00:00Z"
+  },
+  {
+    "id": "cafe-menu",
+    "title": "喫茶ことり メニュー",
+    "file": "samples/02_cafe-menu.pdf",
+    "fileName": "02_cafe-menu.pdf",
+    "pageCount": 8,
+    "direction": "ltr",
+    "allowDownload": true,
+    "cover": "covers/cafe-menu.jpg",
+    "createdAt": "2026-10-07T00:00:00Z"
+  },
+  {
+    "id": "vertical-rtl",
+    "title": "季節のことば",
+    "file": "samples/03_vertical-rtl.pdf",
+    "fileName": "03_vertical-rtl.pdf",
+    "pageCount": 8,
+    "direction": "rtl",
+    "allowDownload": true,
+    "cover": "covers/vertical-rtl.jpg",
+    "createdAt": "2026-10-07T00:00:00Z"
+  },
+  {
+    "id": "town-guide",
+    "title": "港町・汐見を歩く",
+    "file": "samples/04_town-guide.pdf",
+    "fileName": "04_town-guide.pdf",
+    "pageCount": 8,
+    "direction": "ltr",
+    "allowDownload": true,
+    "cover": "covers/town-guide.jpg",
+    "createdAt": "2026-10-07T00:00:00Z"
+  }
+]

@@ -1,9 +1,189 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
+<head><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>電子ブック本棚 デモ</title><script>window.__DEMO_BOOKS__ = [{"id": "company-profile", "title": "会社案内 2026", "file": "samples/01_company-profile.pdf", "fileName": "01_company-profile.pdf", "pageCount": 8, "direction": "ltr", "allowDownload": true, "cover": "covers/company-profile.jpg", "createdAt": "2026-10-07T00:00:00Z"}, {"id": "cafe-menu", "title": "喫茶ことり メニュー", "file": "samples/02_cafe-menu.pdf", "fileName": "02_cafe-menu.pdf", "pageCount": 8, "direction": "ltr", "allowDownload": true, "cover": "covers/cafe-menu.jpg", "createdAt": "2026-10-07T00:00:00Z"}, {"id": "vertical-rtl", "title": "季節のことば", "file": "samples/03_vertical-rtl.pdf", "fileName": "03_vertical-rtl.pdf", "pageCount": 8, "direction": "rtl", "allowDownload": true, "cover": "covers/vertical-rtl.jpg", "createdAt": "2026-10-07T00:00:00Z"}, {"id": "town-guide", "title": "港町・汐見を歩く", "file": "samples/04_town-guide.pdf", "fileName": "04_town-guide.pdf", "pageCount": 8, "direction": "ltr", "allowDownload": true, "cover": "covers/town-guide.jpg", "createdAt": "2026-10-07T00:00:00Z"}];</script><script>// GitHub Pages のデモ用：GAS の google.script.run / history を、静的ファイルで置き換える。
+// demo/build.py がビルド時に BOOKS を埋め込み、各ページの <head> 先頭に差し込む。
+(function () {
+  const BOOKS = window.__DEMO_BOOKS__;
+  const find = id => BOOKS.find(b => b.id === id);
+
+  const api = {
+    getShelf() {
+      return BOOKS.map(b => ({ id: b.id, title: b.title, pageCount: b.pageCount, cover: b.cover, createdAt: b.createdAt }));
+    },
+    // GAS 版は4MBずつ返すが、デモは chunkCount=1 にしてファイル全体を一度に返す
+    async getPdfChunk(id) {
+      const b = find(id);
+      if (!b) throw new Error('ブックが見つかりません');
+      const blob = await fetch(b.file).then(r => {
+        if (!r.ok) throw new Error('PDFを取得できませんでした（' + r.status + '）');
+        return r.blob();
+      });
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result).split(',')[1]);
+        fr.onerror = () => reject(fr.error);
+        fr.readAsDataURL(blob);
+      });
+    },
+  };
+
+  function makeRunner(ok, ng) {
+    return new Proxy({}, {
+      get(_, fn) {
+        if (fn === 'withSuccessHandler') return h => makeRunner(h, ng);
+        if (fn === 'withFailureHandler') return h => makeRunner(ok, h);
+        return (...args) => {
+          if (!api[fn]) { if (ng) ng(new Error('デモ版では使えない機能です')); return; }
+          Promise.resolve().then(() => api[fn](...args)).then(r => ok && ok(r), e => ng && ng(e));
+        };
+      },
+    });
+  }
+
+  window.google = {
+    script: {
+      run: makeRunner(null, null),
+      history: {
+        replace(_, params) {
+          try { history.replaceState(null, '', '?' + new URLSearchParams(params)); } catch (e) { /* 失敗しても閲覧には影響しない */ }
+        },
+      },
+    },
+  };
+
+  /** viewer.html の BOOT を URL から組み立てる（GAS 版では doGet が行う処理） */
+  window.__demoViewerBoot = function () {
+    const q = new URLSearchParams(location.search);
+    const b = find(q.get('book'));
+    if (!b) {
+      location.replace('./');
+      throw new Error('book not found');
+    }
+    return {
+      execUrl: location.origin + location.pathname,   // 共有用URL（viewer.html?book=…）
+      homeUrl: './',
+      startPage: Number(q.get('p')) || 1,
+      fromShelf: q.get('open') === '1',
+      book: {
+        id: b.id, title: b.title, fileName: b.fileName, size: 0, pageCount: b.pageCount,
+        direction: b.direction, allowDownload: b.allowDownload, cover: b.cover,
+        chunkSize: 0, chunkCount: 1,
+      },
+    };
+  };
+
+  // 本棚の下に「デモ版」の注記を出す
+  window.addEventListener('DOMContentLoaded', () => {
+    const footer = document.querySelector('body.paper footer');
+    if (!footer) return;
+    const note = document.createElement('p');
+    note.style.cssText = 'margin:14px 0 0;font-size:13px;color:var(--ink-2);line-height:1.8';
+    note.innerHTML = 'これはデモ版です。PDFの登録は、Google Apps Script に設置すると使えます。<br><a href="https://github.com/n-tsukuda/ebook-shelf-gas">GitHub でコードを見る</a>';
+    footer.appendChild(note);
+  });
+})();
+</script>
   <base target="_top">
   <meta charset="utf-8">
-  <?!= include_('Styles') ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+  :root {
+    /* 紙と墨と真鍮 */
+    --paper: #f4efe6;
+    --bg: var(--paper);
+    --surface: #fbf8f2;
+    --ink: #2a2521;
+    --ink-2: #5c5348;       /* 紙の上で 6.6:1 */
+    --ink-3: #6f6558;       /* 紙の上で 5.0:1（これより薄い色を文字に使わない） */
+    --line: #ddd4c4;
+    --brass: #a8854a;       /* 線・帯などの飾り用。文字には --brass-text */
+    --brass-text: #84652f;  /* 紙の上で 4.7:1 */
+    --brass-2: #c9a96a;
+    --accent: #2a2521;
+    --accent-ink: #f7f2e8;
+    --danger: #a3392e;
+    /* 閲覧室 */
+    --night: #181512;
+    --night-2: #2c2620;
+    --night-ink: #ece4d6;
+    --night-ink-2: #c4b9a6; /* 閲覧室の背景の上で 7.7:1 */
+    --radius: 6px;
+    --shadow: 0 1px 2px rgba(42,37,33,.06), 0 8px 24px rgba(42,37,33,.07);
+    --mincho: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --gothic: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+    --latin: "Cormorant Garamond", "Times New Roman", serif;
+    --ease: cubic-bezier(.2, .7, .2, 1);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--gothic);
+    font-size: 15px;
+    line-height: 1.7;
+    letter-spacing: .02em;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* うっすら紙の質感 */
+  body.paper {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .25 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  a { color: var(--brass-text); }
+  button, input, select { font: inherit; color: inherit; letter-spacing: inherit; }
+  .eyebrow {
+    font-family: var(--latin); font-weight: 600; font-size: 15px;
+    letter-spacing: .26em; text-transform: uppercase; color: var(--brass-text);
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 40px; padding: 0 18px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: transparent; cursor: pointer; text-decoration: none; color: var(--ink);
+    white-space: nowrap; font-size: 14px; transition: background .2s, border-color .2s, color .2s;
+  }
+  .btn:hover { border-color: var(--ink); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { background: #000; }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover { border-color: var(--danger); }
+  .btn.small { min-height: 34px; padding: 0 14px; font-size: 14px; }
+  .icon-btn {
+    width: 40px; height: 40px; padding: 0; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    background: transparent; border: 1px solid transparent; cursor: pointer; color: inherit;
+    transition: background .2s, border-color .2s, opacity .2s;
+  }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .icon-btn:disabled { opacity: .3; cursor: default; }
+  svg.i { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .muted { color: var(--ink-2); }
+  :focus-visible { outline: 2px solid var(--brass-2); outline-offset: 2px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(16px);
+    background: rgba(28,24,21,.92); color: #f4ede1; padding: 10px 22px; border-radius: 999px;
+    font-size: 14px; opacity: 0; pointer-events: none; transition: .3s var(--ease); z-index: 1000;
+    width: max-content; max-width: calc(100% - 32px); text-align: center;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--danger); }
+  .spinner {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid rgba(127,127,127,.2); border-top-color: currentColor;
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+  }
+</style>
+
   <style>
     html, body { height: 100%; overflow: hidden; }
     body {
@@ -185,10 +365,97 @@
     <div id="zoomBody" class="zoomBody"><div id="zoomPages" class="zoomPages"></div></div>
   </div>
 
-  <?!= include_('Common') ?>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  // 日本語PDF（フォント非埋め込み）を正しく描くために CMap と標準フォントを読ませる
+  const PDF_OPTS = {
+    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+    cMapPacked: true,
+    standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/',
+  };
+
+  /** google.script.run を Promise で呼ぶ */
+  function run(fn, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(err => reject(err instanceof Error ? err : new Error(String(err && err.message || err))))[fn](...args);
+    });
+  }
+
+  /**
+   * GASの画面は別オリジンのiframeで動くため、CDNのワーカーを new Worker() で直接は起動できない。
+   * 中身を取ってきて Blob URL にして渡す。失敗しても pdf.js はメインスレッドで動く。
+   */
+  let pdfjsReady = null;
+  function loadPdfjs() {
+    if (!pdfjsReady) {
+      pdfjsReady = fetch(PDFJS_WORKER_URL)
+        .then(r => r.text())
+        .then(src => {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+        })
+        .catch(() => { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL; })
+        .then(() => pdfjsLib);
+    }
+    return pdfjsReady;
+  }
+
+  function toast(msg, isError) {
+    let el = document.getElementById('toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'toast';
+      el.className = 'toast';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.toggle('error', !!isError);
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), isError ? 5000 : 2200);
+  }
+
+  /** iframe内では navigator.clipboard が塞がれることがあるので execCommand に逃がす */
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+      ta.remove();
+      return ok;
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function formatSize(bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+  }
+</script>
+
   <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
   <script>
-    const BOOT = <?!= boot ?>;
+    const BOOT = window.__demoViewerBoot();
     const META = BOOT.book;
     const RTL = META.direction === 'rtl';
     const MIN_PAGE_W = 300;        // 見開きにするのは本の幅がこの2倍以上あるとき

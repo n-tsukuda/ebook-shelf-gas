@@ -5,7 +5,8 @@ Google Apps Script（GAS）で動くので、Googleアカウントがあれば�
 
 このアプリは [Claude Code](https://claude.com/claude-code) と一緒に作りました。
 
-**デモ**：準備中
+**デモ**：https://n-tsukuda.github.io/ebook-shelf-gas/
+（GitHub Pages 上の見本です。ページめくりなどはすべて試せますが、PDFの登録はできません）
 
 ![本棚の画面](docs/images/shelf.jpg)
 
@@ -124,6 +125,23 @@ HTMLファイルは `Admin` `Common` `NotFound` `Shelf` `Styles` `Viewer` の6�
 - GASの画面は別オリジンのiframeで動くため、pdf.js のワーカーは Blob URL にして起動しています。
 - 閲覧時のPDFは4MBずつ並列に取得します。ブックIDからしか引けないので、ドライブのほかのファイルは読めません。
 - `google.script.run` からは末尾が `_` でない関数をだれでも呼べます。管理用の関数を足すときは必ず `assertAdmin_(key)` を通してください。
+
+## デモ（GitHub Pages）について
+
+デモは、`src/` の画面をそのまま静的なページに書き出したものです。`google.script.run` の代わりに `demo/shim.js` が `samples/` のPDFを読み込みます。管理画面（PDFの登録）は含まれません。
+
+`src/` の画面を直したら、次のコマンドでデモを作り直してください（Python 3 だけで動きます）。
+
+```bash
+python3 demo/build.py
+```
+
+| ファイル | 役割 |
+|---|---|
+| `demo/books.json` | デモの本棚に並べる本の一覧 |
+| `demo/shim.js` | GAS の処理を静的ファイルで置き換える |
+| `demo/build.py` | `docs/index.html`（本棚）と `docs/viewer.html`（閲覧）を作る |
+| `docs/` | GitHub Pages で公開されるフォルダ（`build.py` が作る。`docs/images/` は README 用） |
 
 ## サンプルPDF
 
