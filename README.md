@@ -3,6 +3,8 @@
 PDFをアップロードするだけで、ページをめくって読める電子ブックになり、URLで共有できるWebアプリです。
 Google Apps Script（GAS）で動くので、Googleアカウントがあれば無料で使えます。サーバーの用意はいりません。
 
+このアプリは [Claude Code](https://claude.com/claude-code) と一緒に作りました。
+
 **デモ**：準備中
 
 ![本棚の画面](docs/images/shelf.jpg)
