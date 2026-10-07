@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# clasp を使う場合（スクリプトIDを公開しない）
+.clasp.json
+.clasprc.json
+
+node_modules/

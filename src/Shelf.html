@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= include_('Styles') ?>
+  <style>
+    .masthead { text-align: center; padding: 64px 16px 8px; }
+    .masthead h1 {
+      font-family: var(--mincho); font-weight: 600; font-size: clamp(26px, 4.4vw, 40px);
+      letter-spacing: .14em; margin: 10px 0 0; line-height: 1.4;
+    }
+    .ornament { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 20px auto 0; color: var(--brass); }
+    .ornament::before, .ornament::after { content: ""; width: 56px; height: 1px; background: currentColor; opacity: .5; }
+    .ornament span { width: 6px; height: 6px; transform: rotate(45deg); border: 1px solid currentColor; }
+    .count { font-size: 14px; letter-spacing: .12em; color: var(--ink-2); margin: 14px 0 0; }
+
+    .toolbar {
+      max-width: 1120px; margin: 28px auto 0; padding: 0 16px;
+      display: flex; justify-content: center; align-items: center; gap: 16px; position: relative;
+    }
+    .search { position: relative; width: min(340px, 100%); }
+    .search svg { position: absolute; left: 2px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--ink-3); }
+    .search input {
+      width: 100%; height: 42px; padding: 0 4px 0 30px; border: 0; border-bottom: 1px solid var(--line);
+      background: transparent; font-size: 15px; outline: none; transition: border-color .2s; border-radius: 0;
+    }
+    .search input:focus { border-color: var(--ink); }
+    .search input::placeholder { color: var(--ink-3); }
+    .admin-link {
+      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+      font-size: 14px; color: var(--ink-2); text-decoration: none; letter-spacing: .06em;
+    }
+    .admin-link:hover { color: var(--ink); }
+
+    main { max-width: 1120px; margin: 0 auto; padding: 56px 16px 40px; }
+    .shelf {
+      display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+      grid-template-rows: auto auto auto; margin-bottom: 64px;
+    }
+    .slot { grid-row: 1; display: flex; align-items: flex-end; justify-content: center; padding: 0 13%; }
+    .plank {
+      grid-row: 2; grid-column: 1 / -1; height: 16px; margin: 0 -10px; position: relative; z-index: 0;
+      border-radius: 2px;
+      background:
+        repeating-linear-gradient(90deg, rgba(255,255,255,0) 0 37px, rgba(255,255,255,.05) 37px 39px, rgba(0,0,0,.04) 39px 63px),
+        linear-gradient(#b8936a, #9a7650 35%, #7a5b3d);
+      box-shadow: inset 0 1px 0 rgba(255,240,215,.45), 0 12px 18px -8px rgba(70,42,15,.5), 0 2px 0 #5e4430;
+    }
+    .label { grid-row: 3; padding: 18px 10% 0; text-align: center; min-width: 0; }
+    .label a { color: inherit; text-decoration: none; }
+    .label .t {
+      font-family: var(--mincho); font-weight: 700; font-size: 16px; line-height: 1.55; letter-spacing: .04em; color: var(--ink);
+      word-break: auto-phrase; /* 「メニュ／ー」のような途中の改行を避ける（対応ブラウザのみ） */
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .label a:hover .t { color: var(--brass-text); }
+    .label .m { font-size: 13px; letter-spacing: .04em; color: var(--ink-3); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+    .book {
+      position: relative; display: block; width: 100%; z-index: 1;
+      transform-origin: 50% 100%; transition: transform .45s var(--ease), filter .45s var(--ease);
+      filter: drop-shadow(0 1px 1px rgba(40,25,10,.25)) drop-shadow(8px 10px 12px rgba(40,25,10,.18));
+      margin-bottom: -1px;
+    }
+    .book:hover, .book:focus-visible { transform: translateY(-10px); filter: drop-shadow(0 2px 2px rgba(40,25,10,.2)) drop-shadow(10px 22px 22px rgba(40,25,10,.22)); }
+    .book img, .book .blank { display: block; width: 100%; height: auto; border-radius: 1px 3px 3px 1px; background: #fff; }
+    /* 背の陰影 */
+    .book::before {
+      content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
+      background: linear-gradient(90deg, rgba(0,0,0,.22) 0, rgba(255,255,255,.22) 2%, rgba(0,0,0,.1) 3.5%, rgba(0,0,0,0) 8%, rgba(255,255,255,0) 92%, rgba(255,255,255,.12) 100%);
+    }
+    /* 小口（紙の厚み） */
+    .book::after {
+      content: ""; position: absolute; top: 3px; bottom: 2px; right: -5px; width: 5px; border-radius: 0 2px 2px 0;
+      background: repeating-linear-gradient(90deg, #f7f2e8 0 1px, #ddd2bf 1px 2px);
+    }
+    .book .blank {
+      aspect-ratio: 1 / 1.414; background: linear-gradient(135deg, #34493f, #24342d);
+      color: var(--brass-2); font-family: var(--mincho); font-weight: 600; font-size: 14px;
+      display: flex; align-items: center; justify-content: center; padding: 16%; text-align: center; line-height: 1.6;
+      border: 1px solid rgba(201,169,106,.35); outline: 1px solid rgba(201,169,106,.35); outline-offset: -8px;
+    }
+    .new {
+      position: absolute; top: 10px; right: -8px; z-index: 3;
+      font-family: var(--latin); font-weight: 600; font-size: 12px; letter-spacing: .16em;
+      background: var(--brass); color: #fff; padding: 2px 8px 2px 10px; box-shadow: 0 2px 4px rgba(0,0,0,.2);
+    }
+    .empty, .loading { text-align: center; color: var(--ink-2); padding: 72px 0; font-family: var(--mincho); letter-spacing: .1em; }
+    .loading .spinner { margin: 0 auto 16px; color: var(--brass); }
+    footer { text-align: center; padding: 8px 16px 48px; }
+    footer .eyebrow { color: var(--ink-3); font-size: 13px; }
+
+    /* 本を開く演出：表紙が棚から浮き上がって中央へ */
+    .opening { position: fixed; inset: 0; z-index: 100; perspective: 1800px; pointer-events: none; }
+    .opening .room {
+      position: absolute; inset: 0; opacity: 0; transition: opacity .7s var(--ease);
+      background: radial-gradient(ellipse 70% 60% at 50% 45%, var(--night-2), var(--night) 70%);
+    }
+    .opening.on .room { opacity: 1; }
+    .opening img {
+      position: fixed; transform-origin: 0 0; border-radius: 1px 3px 3px 1px;
+      box-shadow: 0 30px 60px rgba(0,0,0,.45);
+    }
+    @media (max-width: 560px) {
+      .masthead { padding-top: 44px; }
+      .admin-link { position: static; transform: none; }
+      .toolbar { flex-direction: column; gap: 10px; }
+      main { padding-top: 44px; }
+      .shelf { margin-bottom: 48px; }
+      .label { padding: 14px 6% 0; }
+      .label .t { font-size: 15px; }
+    }
+  </style>
+</head>
+<body class="paper">
+  <header class="masthead">
+    <div class="eyebrow">Library</div>
+    <h1 id="appTitle"></h1>
+    <div class="ornament"><span></span></div>
+    <p id="count" class="count">&nbsp;</p>
+  </header>
+  <div class="toolbar">
+    <label class="search">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+      <input id="q" type="search" placeholder="タイトルで探す" aria-label="タイトルで探す">
+    </label>
+    <a id="adminLink" class="admin-link" hidden>管理画面 →</a>
+  </div>
+  <main>
+    <div id="list" class="loading"><div class="spinner"></div>本棚を整えています</div>
+  </main>
+  <footer><div class="eyebrow">Digital Library</div></footer>
+
+  <?!= include_('Common') ?>
+  <script>
+    const BOOT = <?!= boot ?>;
+    const NEW_DAYS = 14;
+    let books = [];
+
+    document.getElementById('appTitle').textContent = BOOT.appTitle;
+    if (BOOT.adminUrl) {
+      const a = document.getElementById('adminLink');
+      a.href = BOOT.adminUrl;
+      a.hidden = false;
+    }
+
+    function columns() {
+      const w = document.querySelector('main').clientWidth - 32;
+      if (w < 520) return 2;
+      return Math.max(3, Math.min(6, Math.floor(w / 180)));
+    }
+
+    function bookUrl(b) {
+      return BOOT.execUrl + '?book=' + encodeURIComponent(b.id) + '&open=1';
+    }
+
+    function isNew(b) {
+      const d = new Date(b.createdAt);
+      return !isNaN(d) && (Date.now() - d) / 86400000 < NEW_DAYS;
+    }
+
+    function shelfHtml(row, cols) {
+      const slots = row.map((b, i) => `
+        <div class="slot" style="grid-column:${i + 1}">
+          <a class="book" href="${bookUrl(b)}" tabindex="-1" aria-hidden="true">
+            ${b.cover ? `<img alt="" data-src="${escapeHtml(b.cover)}">` : `<div class="blank">${escapeHtml(b.title)}</div>`}
+            ${isNew(b) ? '<span class="new">NEW</span>' : ''}
+          </a>
+        </div>`).join('');
+      const labels = row.map((b, i) => `
+        <div class="label" style="grid-column:${i + 1}">
+          <a href="${bookUrl(b)}"><div class="t">${escapeHtml(b.title)}</div></a>
+          <div class="m">${b.pageCount}ページ　${formatDot(b.createdAt)}</div>
+        </div>`).join('');
+      return `<section class="shelf" style="--cols:${cols}">${slots}<div class="plank"></div>${labels}</section>`;
+    }
+
+    function formatDot(iso) {
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function draw() {
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const list = document.getElementById('list');
+      const shown = books.filter(b => !q || b.title.toLowerCase().includes(q));
+      document.getElementById('count').textContent = books.length ? '全 ' + books.length + ' 冊' : '';
+      if (!books.length) {
+        list.className = 'empty';
+        list.textContent = 'まだ本が並んでいません';
+        return;
+      }
+      if (!shown.length) {
+        list.className = 'empty';
+        list.textContent = '「' + q + '」に一致する本はありません';
+        return;
+      }
+      const cols = columns();
+      let html = '';
+      for (let i = 0; i < shown.length; i += cols) html += shelfHtml(shown.slice(i, i + cols), cols);
+      list.className = '';
+      list.innerHTML = html;
+      // dataURL は属性に直接書かず JS で入れる
+      list.querySelectorAll('img[data-src]').forEach(img => { img.src = img.dataset.src; });
+    }
+
+    document.getElementById('q').addEventListener('input', draw);
+    let lastCols = 0;
+    window.addEventListener('resize', () => {
+      const c = columns();
+      if (c !== lastCols && books.length) { lastCols = c; draw(); }
+    });
+
+    // ───────── 本を開く演出 ─────────
+    // リンク移動はそのまま進め、次の画面が届くまでの間に表紙を中央へ運ぶ。
+    // 閲覧画面の読み込み中の表紙と同じ位置・大きさに着地させてつなげる。
+    document.getElementById('list').addEventListener('click', e => {
+      const a = e.target.closest('a[href]');
+      if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const slot = a.closest('.slot') || document.querySelector(`.slot [href="${CSS.escape(a.getAttribute('href'))}"]`)?.closest('.slot');
+      const src = slot && slot.querySelector('img');
+      if (!src || !src.naturalWidth) return;
+      playOpening(src);
+    });
+
+    function playOpening(src) {
+      const r = src.getBoundingClientRect();
+      const aspect = src.naturalWidth / src.naturalHeight;
+      const h = Math.min(window.innerHeight * 0.62, 560, (window.innerWidth - 48) / aspect);
+      const w = h * aspect;
+      const left = (window.innerWidth - w) / 2;
+      const top = (window.innerHeight - h) / 2;
+
+      const ov = document.createElement('div');
+      ov.className = 'opening';
+      ov.innerHTML = '<div class="room"></div>';
+      const img = new Image();
+      img.src = src.src;
+      Object.assign(img.style, { left: left + 'px', top: top + 'px', width: w + 'px', height: h + 'px' });
+      ov.appendChild(img);
+      document.body.appendChild(ov);
+      src.closest('.book').style.visibility = 'hidden';
+
+      const s = r.width / w;
+      img.animate([
+        { transform: `translate(${r.left - left}px, ${r.top - top}px) scale(${s})`, boxShadow: '0 4px 10px rgba(0,0,0,.2)' },
+        { transform: `translate(${(r.left - left) * .35}px, ${(r.top - top) * .35 - 20}px) scale(${(s + 1) / 2}) rotateY(-10deg)`, offset: .55 },
+        { transform: 'none', boxShadow: '0 30px 60px rgba(0,0,0,.45)' },
+      ], { duration: 900, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+      requestAnimationFrame(() => ov.classList.add('on'));
+
+      // 戻るボタンで戻ってきたとき・移動できなかったときに元へ戻す
+      const restore = () => { ov.remove(); src.closest('.book').style.visibility = ''; };
+      setTimeout(restore, 15000);
+      window.addEventListener('pageshow', restore, { once: true });
+    }
+
+    run('getShelf')
+      .then(res => { books = res; lastCols = columns(); draw(); })
+      .catch(err => {
+        const list = document.getElementById('list');
+        list.className = 'empty';
+        list.textContent = '読み込めませんでした：' + err.message;
+      });
+  </script>
+</body>
+</html>

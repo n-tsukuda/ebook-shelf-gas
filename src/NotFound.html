@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= include_('Styles') ?>
+  <style>
+    main { max-width: 480px; margin: 0 auto; padding: 96px 16px; text-align: center; }
+    h1 { font-family: var(--mincho); font-weight: 600; font-size: 22px; letter-spacing: .12em; margin: 10px 0 12px; }
+    p { margin: 0 0 24px; }
+  </style>
+</head>
+<body class="paper">
+  <main>
+    <div class="eyebrow">Not Found</div>
+    <h1>ページを表示できません</h1>
+    <p id="msg" class="muted">このブックは削除されたか、URLが間違っています。</p>
+    <a id="home" class="btn">本棚へ戻る</a>
+  </main>
+  <script>
+    const BOOT = <?!= boot ?>;
+    if (BOOT.message) document.getElementById('msg').textContent = BOOT.message;
+    document.getElementById('home').href = BOOT.execUrl;
+  </script>
+</body>
+</html>
